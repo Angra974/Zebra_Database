@@ -7,13 +7,27 @@
  *  Read more {@link https://github.com/stefangabos/Zebra_Database here}
  *
  *  @author     Stefan Gabos <contact@stefangabos.ro>
- *  @version    2.9.14 (last revision: March 21, 2020)
+ *  @version    2.9.13 (last revision: February 26, 2020)
  *  @copyright  (c) 2006 - 2020 Stefan Gabos
  *  @license    http://www.gnu.org/licenses/lgpl-3.0.txt GNU LESSER GENERAL PUBLIC LICENSE
  *  @package    Zebra_Database
  */
 class Zebra_Database {
 
+
+    /**
+     *  Parameters to show only duplicate queries.
+     *
+     *  See the {@link returned_rows} property for getting the number of rows returned by SELECT queries.
+     *
+	 * @value false : show all the queries
+	 * @value true : show only the duplicate queries
+     *
+     *  @var bool
+     */		
+	private $show_only_duplicate_queries = true;
+	
+	
     /**
      *  The number of rows affected after running an INSERT, UPDATE, REPLACE or DELETE query.
      *
@@ -179,33 +193,6 @@ class Zebra_Database {
      *  @var boolean
      */
     public $debug_show_explain;
-
-    /**
-     *  Indicates whether $_REQUEST, $_POST, $_GET, $_SESSION, $_COOKIE, $_FILES and $_SERVER globals should be available
-     *  in the debugging console, under the "globals" section.
-     *
-     *  Can be set to either boolean TRUE or FALSE, as a global setting, or as an associative array where each option's
-     *  visibility can be individually be set, like in the example below:
-     *
-     *  <code>
-     *  $db->debug_show_globals(array(
-     *      'request'   =>  true,
-     *      'post'      =>  true,
-     *      'get'       =>  true,
-     *      'session'   =>  true,
-     *      'cookie'    =>  true,
-     *      'files'     =>  true,
-     *      'server'    =>  true,
-     *  ));
-     *  </code>
-     *
-     *  Default is TRUE.
-     *
-     *  @since  2.9.14
-     *
-     *  @var mixed
-     */
-    public $debug_show_globals;
 
     /**
      *  Sets the number records returned by SELECT queries to be shown in the debugging console.
@@ -683,13 +670,6 @@ class Zebra_Database {
         // spell-checker: enable
 
     );
-    
-    
-    /*
-    * convenience for compatibility with project
-    *$ this->insert_id = $this->insert_id();
-    */
-    public $insert_id;
 
     /**
      *  Constructor of the class
@@ -711,7 +691,7 @@ class Zebra_Database {
 
         $this->debug_show_records = 20;
 
-        $this->debug = $this->debug_show_backtrace = $this->debug_show_explain = $this->debug_show_globals = $this->halt_on_errors = $this->minimize_console = $this->auto_quote_replacements = true;
+        $this->debug = $this->debug_show_backtrace = $this->debug_show_explain = $this->halt_on_errors = $this->minimize_console = $this->auto_quote_replacements = true;
 
         $this->language('english');
 
@@ -2363,7 +2343,7 @@ class Zebra_Database {
 
         // prepare the values
         $sql .= implode(', ', array_map(function($row) {
-            return '(' . implode(', ', array_map(function($value) { return $this->_is_mysql_function($value) ? (is_null($value) ? 'NULL' : $value) : '"' . $this->escape($value) . '"'; }, $row)) . ')' . "\n";
+            return '(' . implode(', ', array_map(function($value) { return $this->_is_mysql_function($value) ? $value : '"' . $this->escape($value) . '"'; }, $row)) . ')' . "\n";
         }, $values));
 
         // if $update is an array and is not empty
@@ -2385,7 +2365,7 @@ class Zebra_Database {
                 else
 
                     // it means we have probably given a static value
-                    return '`' . $column . '` = ' . ($this->_is_mysql_function($value) ? (is_null($value) ? 'NULL' : $value) : '"' . $this->escape($value) . '"');
+                    return '`' . $column . '` = ' . ($this->_is_mysql_function($value) ? $value : '"' . $this->escape($value) . '"');
 
             }, array_keys($update), array_values($update)));
 
@@ -2547,7 +2527,7 @@ class Zebra_Database {
             if ($this->_is_mysql_function($value)) {
 
                 // use it as it is
-                $values .= (is_null($value) ? 'NULL' : $value);
+                $values .= $value;
 
                 // we don't need this value in the replacements array
                 unset($columns[$column_name]);
@@ -2987,8 +2967,8 @@ class Zebra_Database {
             // by default, we assume that the cache exists and is not expired
             $refreshed_cache = false;
 
-            // if caching method is "memcache" and memcache is enabled
-            if ($this->caching_method == 'memcache' && $this->memcache) {
+            // if caching method is "memcache"
+            if ($this->caching_method == 'memcache') {
 
                 // the key to identify this particular information (prefix it if required)
                 $memcache_key = md5($this->memcache_key_prefix . $sql);
@@ -3182,8 +3162,8 @@ class Zebra_Database {
                     // the content to be cached
                     $content = base64_encode(gzcompress(serialize($cache_data)));
 
-                    // if caching method is "memcache" and memcache is enabled
-                    if ($this->caching_method == 'memcache' && $this->memcache)
+                    // if caching method is "memcache"
+                    if ($this->caching_method == 'memcache')
 
                         // cache query data
                         $this->memcache->set($memcache_key, $content, ($this->memcache_compressed ? MEMCACHE_COMPRESSED : false), $cache);
@@ -3411,8 +3391,6 @@ class Zebra_Database {
 
         }
 
-        $this->insert_id = $this->insert_id();
-        
         // in case of error
         // save debug information
         return $this->_log('unsuccessful-queries', array(
@@ -4144,7 +4122,7 @@ class Zebra_Database {
             } elseif ($this->_is_mysql_function($value)) {
 
                 // build the string without enclosing this value in quotes
-                $sql .= '`' . $column_name . '` = ' . (is_null($value) ? 'NULL' : $value);
+                $sql .= '`' . $column_name . '` = ' . $value;
 
                 // we don't need this anymore
                 unset($columns[$column_name]);
@@ -4212,7 +4190,7 @@ class Zebra_Database {
                 ));
 
             // if caching is to be done to a memcache server and we don't yet have a connection
-            if ($this->caching_method == 'memcache' && !$this->memcache && $this->memcache_host !== false && $this->memcache_port !== false) {
+            if (!$this->memcache && $this->memcache_host !== false && $this->memcache_port !== false) {
 
                 // if memcache extension is installed
                 if (class_exists('Memcache')) {
@@ -4262,7 +4240,9 @@ class Zebra_Database {
      *  @return void
      */
     function _debug() {
-
+		// initialize var ( error on tracy debugger  on line 4567 )
+		$counter = 0;
+		
         // if
         if (
 
@@ -4286,19 +4266,14 @@ class Zebra_Database {
 
             if (is_array($this->debug)) return call_user_func_array(array($this, '_write_log'), $this->debug);
 
-            // include the SqlFormatter library, if available
-            @include_once 'includes/SqlFormatter.php';
+            // include the SqlFormatter library
+            require_once 'includes/SqlFormatter.php';
 
-            // if SqlFormatter is available
-            if (class_exists('SqlFormatter')) {
-
-                // set some properties for the formatter
-                SqlFormatter::$number_attributes = SqlFormatter::$boundary_attributes = 'class="symbol"';
-                SqlFormatter::$quote_attributes = 'class="string"';
-                SqlFormatter::$reserved_attributes = 'class="keyword"';
-                SqlFormatter::$tab = '    ';
-
-            }
+            // set some properties for the formatter
+            SqlFormatter::$number_attributes = SqlFormatter::$boundary_attributes = 'class="symbol"';
+            SqlFormatter::$quote_attributes = 'class="string"';
+            SqlFormatter::$reserved_attributes = 'class="keyword"';
+            SqlFormatter::$tab = '    ';
 
             // if warnings are not disabled
             if (!$this->disable_warnings)
@@ -4320,14 +4295,14 @@ class Zebra_Database {
                     'identifier'    => 'e',
                     'generated'     => '',
                 ),
-                'unsuccessful-queries'  => array(
-                    'counter'       => 0,
-                    'identifier'    => 'uq',
-                    'generated'     => '',
-                ),
                 'successful-queries'    => array(
                     'counter'       => 0,
                     'identifier'    => 'sq',
+                    'generated'     => '',
+                ),
+                'unsuccessful-queries'  => array(
+                    'counter'       => 0,
+                    'identifier'    => 'uq',
                     'generated'     => '',
                 ),
                 'warnings'              => array(
@@ -4339,10 +4314,6 @@ class Zebra_Database {
                     'generated'     => '',
                 ),
             );
-
-            // if we don't have to show globals
-            // (value is boolean FALSE or is an array but all entries are set to FALSE)
-            if ($this->debug_show_globals === false || (is_array($this->debug_show_globals) && empty(array_filter($this->debug_show_globals, function($value) { return $value !== false; })))) unset($blocks['globals']);
 
             // there are no warnings
             $warnings = false;
@@ -4358,6 +4329,8 @@ class Zebra_Database {
                     // iterate through the error message
                     foreach ($this->debug_info[$block] as $debug_info) {
 
+                        if (!$this->show_only_duplicate_queries || ($this->show_only_duplicate_queries && isset($debug_info['warning']) && trim($debug_info['warning']) != '')) {
+
                         // increment the messages counter
                         $counter = ++$blocks[$block]['counter'];
 
@@ -4367,18 +4340,21 @@ class Zebra_Database {
                         if (isset($debug_info['query']))
 
                             // format and highlight query
-                            $debug_info['query'] = class_exists('SqlFormatter') ? SqlFormatter::format($debug_info['query']) : $debug_info['query'];
+                            $debug_info['query'] = SqlFormatter::format($debug_info['query']);
 
                         // all blocks are enclosed in tables
                         $output .= '
                             <table cellspacing="0" cellpadding="0" border="0" class="zdc-entry' .
 
-                                // should this query be highlighted or is a transaction
-                                ($block == 'unsuccessful-queries' && isset($debug_info['error']) ? ' zdc-visible' : (isset($debug_info['highlight']) && $debug_info['highlight'] == 1 ? ' zdc-highlight zdc-visible' : (isset($debug_info['transaction']) && $debug_info['transaction'] ? ' zdc-transaction' : ''))) .
+                                // apply a class for even rows
+                                ($counter % 2 == 0 ? ' even' : '') .
+
+                                // should this query be highlighted
+                                (isset($debug_info['highlight']) && $debug_info['highlight'] == 1 ? ' zdc-highlight' : '') .
 
                             '">
                                 <tr>
-                                    <td class="zdc-counter">' . str_pad($counter, 3, '0', STR_PAD_LEFT) . '</td>
+                                    <td class="zdc-counter" valign="top">' . str_pad($counter, 3, '0', STR_PAD_LEFT) . '</td>
                                     <td class="zdc-data">
                         ';
 
@@ -4418,7 +4394,7 @@ class Zebra_Database {
                         if (isset($debug_info['query']) )
 
                             $output .= '
-                                <div class="zdc-box">' .
+                                <div class="zdc-box' . (isset($debug_info['transaction']) && $debug_info['transaction'] ? ' zdc-transaction' : '') . '">' .
                                     preg_replace('/^\<br\>/', '', html_entity_decode($debug_info['query'])) . '
                                 </div>
                             ';
@@ -4454,7 +4430,7 @@ class Zebra_Database {
                             $output .= '
                                 <li class="zdc-time">' .
                                     $this->language['execution_time'] . ': ' .
-                                    number_format($debug_info['execution_time'], 5) . ' ' .
+                                    $this->_fix_pow($debug_info['execution_time']) . ' ' .
                                     $this->language['seconds'] . ' (<strong>' .
                                     number_format(
                                         ($this->total_execution_time != 0 ? $debug_info['execution_time'] * 100 / $this->total_execution_time : 0),
@@ -4468,8 +4444,8 @@ class Zebra_Database {
 
                                 // button for reviewing returned rows
                                 $output .= '
-                                    <li>
-                                        ' . (!empty($debug_info['records']) ? '<a href="javascript: void(0)" class="zdc-records zdc-toggle zdc-records-table">' : '') .
+                                    <li class="zdc-records">
+                                        ' . (!empty($debug_info['records']) ? '<a href="javascript:zdc_toggle(\'zdc-records-sq' . $counter . '\')">' : '') .
                                             $this->language['returned_rows'] . ': <strong>' . $debug_info['returned_rows'] . '</strong>
                                         ' . (!empty($debug_info['records']) ? '</a>' : '') . '
                                     </li>
@@ -4490,8 +4466,8 @@ class Zebra_Database {
 
                                 // button for reviewing EXPLAIN results
                                 $output .= '
-                                    <li>
-                                        <a href="javascript: void(0)" class="zdc-explain zdc-toggle zdc-explain-table">' .
+                                    <li class="zdc-explain">
+                                        <a href="javascript:zdc_toggle(\'zdc-explain-sq' . $counter . '\')">' .
                                             $this->language['explain'] . '
                                         </a>
                                     </li>
@@ -4503,8 +4479,8 @@ class Zebra_Database {
                         if (isset($debug_info['backtrace']))
 
                             $output .= '
-                                <li>
-                                    <a href="javascript: void(0)" class="zdc-backtrace zdc-toggle zdc-backtrace-table">' .
+                                <li class="zdc-backtrace">
+                                    <a href="javascript:zdc_toggle(\'zdc-backtrace-' . $identifier . $counter . '\')">' .
                                         $this->language['backtrace'] . '
                                     </a>
                                 </li>
@@ -4512,13 +4488,13 @@ class Zebra_Database {
 
                         // common actions (to top, close all)
                         $output .= '
-                            <li>
-                                <a href="' . preg_replace('/\#zdc\-top$/i', '', $_SERVER['REQUEST_URI']) . '#zdc-top" class="zdc-top">' .
+                            <li class="zdc-top">
+                                <a href="' . preg_replace('/\#zdc\-top$/i', '', $_SERVER['REQUEST_URI']) . '#zdc-top">' .
                                     $this->language['to_top'] . '
                                 </a>
                             </li>
-                            <li>
-                                <a href="javascript: void(0)" class="zdc-close">' .
+                            <li class="zdc-close">
+                                <a href="javascript:zdc_closeAll(\'\')">' .
                                     $this->language['close_all'] . '
                                 </a>
                             </li>
@@ -4549,37 +4525,60 @@ class Zebra_Database {
 
                             // start generating output
                             $output .= '
-                                <div class="zdc-box zdc-data-table zdc-' . $table . '-table">
+                                <div id="zdc-' . $table . '-' . $identifier . $counter . '" class="zdc-box zdc-' . $table . '-table">
                                     <table cellspacing="0" cellpadding="0" border="0">
-                                        <thead><tr>
+                                        <tr>
                             ';
 
                             // print table headers
                             foreach (array_keys($debug_info[$table][0]) as $header) $output .= '<th>' . $header . '</th>';
 
-                            $output .= '</tr></thead><tbody>';
+                            $output .= '</tr>';
 
                             // print table rows and columns
-                            foreach ($debug_info[$table] as $row) {
-
-                                $output .= '<tr>';
-
-                                foreach (array_values($row) as $column) $output .= '<td>' . $column . '</td>';
-
+                           $link = '';
+							foreach ($debug_info[$table] as $index => $row) {
+			
+                                $output .= '<tr class="' . (($index + 1) % 2 == 0 ? 'even' : '') . '">';
+							
+									/* open link with tracy debugger ***/
+									if(isset($row['File'])) {
+										$link = "<a href='editor://open/?file=".$row['File']."&line=".$row['Line']."&search=%search&replace=%replace'>";
+									}
+								
+								$i = 0;
+                                foreach (array_values($row) as $column) 
+								{
+									if($i == 0)
+									{
+										$output .= '<td valign="top">' . $link.$column . '</a></td>';
+									} else {
+										$output .= '<td valign="top">' . $column . '</td>';										
+									}
+									$i = 1;
+								}
                                 $output .= '</tr>';
 
                             }
 
                             // wrap up data tables
-                            $output .= '</tbody></table></div>';
+                            $output .= '
+                                    </table>
+                                </div>
+                            ';
 
                         }
 
                         // finish block
-                        $output .= '</td></tr></table>';
+                        $output .= '
+                                    </td>
+                                </tr>
+                            </table>
+                        ';
 
                     }
-
+					
+				}
                     // if anything was generated for the current block
                     // enclose generated output in a special div
                     if ($counter > 0) $blocks[$block]['generated'] = '<div id="zdc-' . $block . '">' . $output . '</div>';
@@ -4587,9 +4586,7 @@ class Zebra_Database {
                 } elseif ($block == 'globals') {
 
                     // globals to show
-                    $globals =  $this->debug_show_globals === true ?
-                                array('REQUEST', 'POST', 'GET', 'SESSION', 'COOKIE', 'FILES', 'SERVER') :
-                                array_map('strtoupper', array_keys(array_filter($this->debug_show_globals, function($value) { return $value !== false; })));
+                    $globals = array('POST', 'GET', 'SESSION', 'COOKIE', 'FILES', 'SERVER');
 
                     // start building output
                     $output = '
@@ -4603,7 +4600,7 @@ class Zebra_Database {
                         // add button to submenu
                         $output .=
                             '<li>
-                                <a href="javascript: void(0)" class="zdc-toggle zdc-toggle-id zdc-globals-' . strtolower($global) . '">$_' .
+                                <a href="javascript:zdc_toggle(\'zdc-globals-' . strtolower($global) . '\')">$_' .
                                     $global . '
                                 </a>
                             </li>
@@ -4626,7 +4623,7 @@ class Zebra_Database {
                         $output .= '
                             <table cellspacing="0" cellpadding="0" border="0" id="zdc-globals-' . strtolower($global) . '" class="zdc-entry">
                                 <tr>
-                                    <td class="zdc-counter">001</td>
+                                    <td class="zdc-counter" valign="top">001</td>
                                     <td class="zdc-data">
                                         <div class="zdc-box">
                                             <strong>$_' . $global . '</strong>
@@ -4653,9 +4650,9 @@ class Zebra_Database {
 
             // finalize output by enclosing the debugging console's menu and generated blocks in a container
             $output = '
-                <div id="zdc">
+                <div id="zdc" style="display:' . ($this->minimize_console ? 'none' : 'block') . '">
                     <a name="zdc-top"></a>
-                    <ul id="zdc-main" class="' . ($this->minimize_console ? '' : 'zdc-visible') . '">
+                    <ul class="zdc-main">
             ';
 
             // are there any error messages?
@@ -4664,7 +4661,7 @@ class Zebra_Database {
                 // button for reviewing errors
                 $output .= '
                     <li>
-                        <a href="javascript: void(0)" class="zdc-toggle zdc-errors">' .
+                        <a href="javascript:zdc_toggle(\'zdc-errors\')">' .
                             $this->language['errors'] . ': <span>' . $blocks['errors']['counter'] . '</span>
                         </a>
                     </li>
@@ -4673,40 +4670,35 @@ class Zebra_Database {
             // common buttons
             $output .= '
                 <li>
-                    <a href="javascript: void(0)" class="zdc-toggle zdc-successful-queries">' .
+                    <a href="javascript:zdc_toggle(\'zdc-successful-queries\')">' .
                         $this->language['successful_queries'] . ': <span>' . $blocks['successful-queries']['counter'] . '</span>&nbsp;(' .
-                        number_format($this->total_execution_time, 5) . ' ' . $this->language['seconds'] . ')
+                        $this->_fix_pow($this->total_execution_time) . ' ' . $this->language['seconds'] . ')
                     </a>
                 </li>
                 <li>
-                    <a href="javascript: void(0)" class="zdc-toggle zdc-unsuccessful-queries">' .
+                    <a href="javascript:zdc_toggle(\'zdc-unsuccessful-queries\')">' .
                         $this->language['unsuccessful_queries'] . ': <span>' . $blocks['unsuccessful-queries']['counter'] . '</span>
                     </a>
                 </li>
             ';
 
-            // if there are any warnings
             if (isset($this->debug_info['warnings']))
 
                 $output .= '
                     <li>
-                        <a href="javascript: void(0)" class="zdc-toggle zdc-warnings">' .
+                        <a href="javascript:zdc_toggle(\'zdc-warnings\')">' .
                             $this->language['warnings'] . ': <span>' . $blocks['warnings']['counter'] . '</span>
                         </a>
                     </li>
                 ';
 
-            // if globals are to be shown
-            // (value is boolean TRUE or is an array with at least one entry set to TRUE)
-            if ($this->debug_show_globals === true || (is_array($this->debug_show_globals) && !empty(array_filter($this->debug_show_globals, function($value) { return $value !== false; }))))
-
-                $output .= '
-                    <li>
-                        <a href="javascript: void(0)" class="zdc-toggle zdc-toggle-id zdc-globals-submenu">' .
-                            $this->language['globals'] . '
-                        </a>
-                    </li>
-                ';
+            $output .= '
+                <li>
+                    <a href="javascript:zdc_toggle(\'zdc-globals-submenu\')">' .
+                        $this->language['globals'] . '
+                    </a>
+                </li>
+            ';
 
             // wrap up debugging console's menu
             $output .= '
@@ -4722,13 +4714,30 @@ class Zebra_Database {
             // add the minified version of the debugging console
             $output .= '
                 <div id="zdc-mini">
-                    <a href="javascript: void(0)" class="zdc-toggle zdc-toggle-id zdc-main">' .
+                    <a href="javascript:zdc_toggle(\'console\')">' .
                         $blocks['successful-queries']['counter'] . ($warnings ? '<span>!</span>' : '') . ' / ' . $blocks['unsuccessful-queries']['counter'] . '
                     </a>
                 </div>
             ';
 
-            // use the provided resource path for stylesheets and javascript (if any)
+            // show generated output
+            return $output;
+
+        }
+
+    }
+	
+	
+	/*
+	*	
+	* 
+	*	@return link to css and js files, you can now put them on header and footer separately
+	*/
+	public function get_ZD_templates_files()
+	{
+		$zd_files = array();
+		$path = null;
+	    // use the provided resource path for stylesheets and javascript (if any)
             if (!is_null($this->resource_path))
 
                 $path = rtrim(preg_replace('/\\\/', '/', '//' . $_SERVER['SERVER_NAME'] . ($_SERVER['SERVER_PORT'] != '80' ? ':' . $_SERVER['SERVER_PORT'] : '') . DIRECTORY_SEPARATOR . $this->resource_path), '/');
@@ -4740,18 +4749,15 @@ class Zebra_Database {
                 // the CSS and the JavaScript files
                 $path = rtrim(preg_replace('/\\\/', '/', '//' . $_SERVER['SERVER_NAME'] . ($_SERVER['SERVER_PORT'] != '80' ? ':' . $_SERVER['SERVER_PORT'] : '') . DIRECTORY_SEPARATOR . substr(dirname(__FILE__), strlen(realpath($_SERVER['DOCUMENT_ROOT'])))), '/');
 
+
             // link the required javascript
-            $output = '<script type="text/javascript" src="' . $path . '/public/javascript/database.js"></script>' . $output;
+            $zd_files['js'] = '<script type="text/javascript" src="' . $path . '/public/javascript/database.js"></script>';
 
             // link the required css file
-            $output = '<link rel="stylesheet" href="' . $path . '/public/css/database.css" type="text/css">' . $output;
-
-            // show generated output
-            echo $output;
-
-        }
-
-    }
+            $zd_files['css'] = '<link rel="stylesheet" href="' . $path . '/public/css/database.css" type="text/css">';
+			
+		return $zd_files;
+	}
 
     /**
      *  Encloses segments of a database.table.column construction in grave accents.
@@ -4786,7 +4792,7 @@ class Zebra_Database {
                 if ($value !== '*' && !$this->_is_mysql_function($value)) {
 
                     // if alias is used
-                    if (stripos($value, ' AS ') !== false) list($value, $alias) = array_map('trim', preg_split('/ AS /i', $value));
+                    if (stripos($value, ' as ') !== false) list($value, $alias) = array_map('trim', preg_split('/ as /i', $value));
 
                     // enclose value in grave accents
                     return '`' . $value . '`' . (isset($alias) ? ' AS ' . $alias : '');
@@ -4794,7 +4800,7 @@ class Zebra_Database {
                 }
 
                 // return the value as it is otherwise
-                return (is_null($value) ? 'NULL' : $value);
+                return $value;
 
             }, $entry);
 
@@ -4805,6 +4811,29 @@ class Zebra_Database {
 
         // recompose the string and return it
         return implode(', ', $result);
+
+    }
+
+    /**
+     *  PHP's microtime() will return elapsed time as something like 9.79900360107E-5 when the elapsed time is too short.
+     *
+     *  This function takes care of that and returns the number in the human readable format.
+     *
+     *  @access private
+     */
+    private function _fix_pow($value) {
+
+        // use value as literal
+        $value = (string)$value;
+
+        // if the power is present in the value
+        if (preg_match('/E\-([0-9]+)$/', $value, $matches) > 0)
+
+            // convert to human readable format
+            $value = '0.' . str_repeat('0', $matches[1] - 1) . preg_replace('/\./', '', substr($value, 0, -strlen($matches[0])));
+
+        // return the value
+        return number_format($value, 3);
 
     }
 
@@ -5091,7 +5120,7 @@ class Zebra_Database {
 
                             // if execution time is available
                             // (is not available for unsuccessful queries)
-                            (isset($debug_info['execution_time']) ? $labels[2] . str_pad('', $longest_label_length - strlen(utf8_decode($labels[2])), ' ', STR_PAD_RIGHT) . ': ' . number_format($debug_info['execution_time'], 5) . ' ' . $this->language['seconds'] . "\n" : '') .
+                            (isset($debug_info['execution_time']) ? $labels[2] . str_pad('', $longest_label_length - strlen(utf8_decode($labels[2])), ' ', STR_PAD_RIGHT) . ': ' . $this->_fix_pow($debug_info['execution_time']) . ' ' . $this->language['seconds'] . "\n" : '') .
 
                             // if there is a warning message
                             (isset($debug_info['warning']) && $debug_info['warning'] != '' ? $labels[3] . str_pad('', $longest_label_length - strlen(utf8_decode($labels[3])), ' ', STR_PAD_RIGHT) . ': ' . strip_tags($debug_info['warning']) . "\n" : '') .
