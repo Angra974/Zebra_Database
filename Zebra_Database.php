@@ -683,6 +683,13 @@ class Zebra_Database {
         // spell-checker: enable
 
     );
+    
+    
+    /*
+    * convenience for compatibility with project
+    *$ this->insert_id = $this->insert_id();
+    */
+    public $insert_id;
 
     /**
      *  Constructor of the class
@@ -3404,6 +3411,8 @@ class Zebra_Database {
 
         }
 
+        $this->insert_id = $this->insert_id();
+        
         // in case of error
         // save debug information
         return $this->_log('unsuccessful-queries', array(
